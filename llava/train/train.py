@@ -316,13 +316,17 @@ def preprocess_multimodal(
     for source in sources:
         for sentence in source:
             if DEFAULT_IMAGE_TOKEN in sentence['value']:
-                sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '').strip()
-                sentence['value'] = DEFAULT_IMAGE_TOKEN + '\n' + sentence['value']
-                sentence['value'] = sentence['value'].strip()
-                if "mmtag" in conversation_lib.default_conversation.version:
-                    sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>')
+                pass 
+                # Yuheng: below is orginal code: keep only one image and move it to the beginning of the sentence 
+                # sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '').strip()
+                # sentence['value'] = DEFAULT_IMAGE_TOKEN + '\n' + sentence['value']
+                # sentence['value'] = sentence['value'].strip()
+                # if "mmtag" in conversation_lib.default_conversation.version:
+                #     sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>')
             replace_token = DEFAULT_IMAGE_TOKEN
+
             if data_args.mm_use_im_start_end:
+                assert False, 'Yuheng: I have not checked for this case. Also, it seems the later training code do not support it anymore?' 
                 replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
             sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
 
@@ -655,6 +659,21 @@ def preprocess(
     return dict(input_ids=input_ids, labels=targets)
 
 
+def expand2square(pil_img, background_color):
+    # moved out from original code in LazySupervisedDataset
+    width, height = pil_img.size
+    if width == height:
+        return pil_img
+    elif width > height:
+        result = Image.new(pil_img.mode, (width, width), background_color)
+        result.paste(pil_img, (0, (width - height) // 2))
+        return result
+    else:
+        result = Image.new(pil_img.mode, (height, height), background_color)
+        result.paste(pil_img, ((height - width) // 2, 0))
+        return result
+
+
 class LazySupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
@@ -695,47 +714,43 @@ class LazySupervisedDataset(Dataset):
             sources = [sources]
         assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
         if 'image' in sources[0]:
-            image_file = self.list_data_dict[i]['image']
+            image_file01 = self.list_data_dict[i]['image']
             image_folder = self.data_args.image_folder
             processor = self.data_args.image_processor
-            image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
+
+            image0 = Image.open(os.path.join(image_folder, image_file01[0])).convert('RGB')
+            image1 = Image.open(os.path.join(image_folder, image_file01[1])).convert('RGB')
             if self.data_args.image_aspect_ratio == 'pad':
-                def expand2square(pil_img, background_color):
-                    width, height = pil_img.size
-                    if width == height:
-                        return pil_img
-                    elif width > height:
-                        result = Image.new(pil_img.mode, (width, width), background_color)
-                        result.paste(pil_img, (0, (width - height) // 2))
-                        return result
-                    else:
-                        result = Image.new(pil_img.mode, (height, height), background_color)
-                        result.paste(pil_img, ((height - width) // 2, 0))
-                        return result
-                image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-            else:
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+                image0 = expand2square(image0, tuple(int(x*255) for x in processor.image_mean))
+                image1 = expand2square(image1, tuple(int(x*255) for x in processor.image_mean))
+            image0 = processor.preprocess(image0, return_tensors='pt')['pixel_values'][0]
+            image1 = processor.preprocess(image1, return_tensors='pt')['pixel_values'][0]
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]),
                 self.data_args)
         else:
             sources = copy.deepcopy([e["conversations"] for e in sources])
+
+        
+        
         data_dict = preprocess(
             sources,
             self.tokenizer,
             has_image=('image' in self.list_data_dict[i]))
+        
         if isinstance(i, int):
             data_dict = dict(input_ids=data_dict["input_ids"][0],
                              labels=data_dict["labels"][0])
 
         # image exist in the data
         if 'image' in self.list_data_dict[i]:
-            data_dict['image'] = image
+            data_dict['image0'] = image0
+            data_dict['image1'] = image1
         elif self.data_args.is_multimodal:
             # image does not exist in the data, but the model is multimodal
             crop_size = self.data_args.image_processor.crop_size
-            data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
+            data_dict['image0'] = torch.zeros(3, crop_size['height'], crop_size['width'])
+            data_dict['image1'] = torch.zeros(3, crop_size['height'], crop_size['width'])
         return data_dict
 
 
@@ -763,12 +778,21 @@ class DataCollatorForSupervisedDataset(object):
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
 
-        if 'image' in instances[0]:
-            images = [instance['image'] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
+        if ('image0' in instances[0]) and ('image1' in instances[0]):
+
+            images0 = [instance['image0'] for instance in instances]
+            if all(x is not None and x.shape == images0[0].shape for x in images0):
+                batch['images0'] = torch.stack(images0) # if all with the same res, stack them
             else:
-                batch['images'] = images
+                batch['images0'] = images0 # otherwise, keep it as a list 
+
+
+            images1 = [instance['image1'] for instance in instances]
+            if all(x is not None and x.shape == images1[0].shape for x in images1):
+                batch['images1'] = torch.stack(images1) # if all with the same res, stack them
+            else:
+                batch['images1'] = images1 # otherwise, keep it as a list 
+
 
         return batch
 
@@ -963,6 +987,10 @@ def train(attn_implementation=None):
                     args=training_args,
                     **data_module)
 
+    # train_dataset = data_module['train_dataset']
+    # xx = train_dataset[0]  # input_ids, labels, image
+    # input_ids = xx['input_ids']        
+    # breakpoint()
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
     else:

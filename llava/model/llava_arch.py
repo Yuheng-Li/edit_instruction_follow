@@ -144,9 +144,10 @@ class LlavaMetaForCausalLM(ABC):
 
     def prepare_inputs_labels_for_multimodal(
         self, input_ids, position_ids, attention_mask, past_key_values, labels,
-        images, image_sizes=None
+        images0, images1, image_sizes=None
     ):
         vision_tower = self.get_vision_tower()
+        """  - - - - - - Original code - - - - -   
         if vision_tower is None or images is None or input_ids.shape[1] == 1:
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
@@ -201,6 +202,22 @@ class LlavaMetaForCausalLM(ABC):
         else:
             image_features = self.encode_images(images)
 
+        """
+
+        # Get image features in order
+        if (vision_tower is None) or (images0 is None) or (images1 is None) or input_ids.shape[1] == 1:
+            return input_ids, position_ids, attention_mask, past_key_values, None, labels
+
+        assert images0.ndim == 4 and images1.ndim == 4, 'Only support this case for now'
+        image_features0 = self.encode_images(images0)
+        image_features1 = self.encode_images(images1)
+        image_features = []
+        for image_feature0, image_feature1 in zip(image_features0, image_features1):
+            image_features.append(image_feature0)
+            image_features.append(image_feature1)
+        image_features = torch.stack(image_features)
+
+
         # TODO: image start / end is not implemented here to support pretraining.
         if getattr(self.config, 'tune_mm_mlp_adapter', False) and getattr(self.config, 'mm_use_im_start_end', False):
             raise NotImplementedError
@@ -245,13 +262,14 @@ class LlavaMetaForCausalLM(ABC):
             cur_labels = labels[batch_idx]
             cur_labels_noim = []
             for i in range(len(image_token_indices) - 1):
-                cur_input_ids_noim.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]])
+                cur_input_ids_noim.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]]) # cur_input_ids is like [2,5,120,-200,5,52].  cur_input_ids_noim is like [ [2,5,120], [5,52] ] 
                 cur_labels_noim.append(cur_labels[image_token_indices[i]+1:image_token_indices[i+1]])
-            split_sizes = [x.shape[0] for x in cur_labels_noim]
-            cur_input_embeds = self.get_model().embed_tokens(torch.cat(cur_input_ids_noim))
-            cur_input_embeds_no_im = torch.split(cur_input_embeds, split_sizes, dim=0)
-            cur_new_input_embeds = []
-            cur_new_labels = []
+            
+            split_sizes = [x.shape[0] for x in cur_labels_noim] # len of each sub seq divided by image token
+            cur_input_embeds = self.get_model().embed_tokens(torch.cat(cur_input_ids_noim)) 
+            cur_input_embeds_no_im = torch.split(cur_input_embeds, split_sizes, dim=0) # split based on each sub seq len. something like [  torch.size(seq1, D), torch.size(seq2, D),  ... ]
+            cur_new_input_embeds = [] # will be used to store both image and text embeds 
+            cur_new_labels = []  # will be used to store both image and text labels
 
             for i in range(num_images + 1):
                 cur_new_input_embeds.append(cur_input_embeds_no_im[i])
@@ -276,7 +294,10 @@ class LlavaMetaForCausalLM(ABC):
             new_input_embeds = [x[:tokenizer_model_max_length] for x in new_input_embeds]
             new_labels = [x[:tokenizer_model_max_length] for x in new_labels]
 
+        assert cur_image_idx == image_features.shape[0], 'It should use up all image_features, but something wrong happens'
+
         # Combine them
+        # Yuheng: I did not check below code, it most likely combine batch dim. (i.e., pad to max_len for all samples in a batch, and cat into a tensor)
         max_len = max(x.shape[0] for x in new_input_embeds)
         batch_size = len(new_input_embeds)
 
