@@ -159,5 +159,89 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
             inputs['image_sizes'] = image_sizes
         return inputs
 
+
+
+    def get_score(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        images0: Optional[torch.FloatTensor] = None,
+        images1: Optional[torch.FloatTensor] = None,
+        return_dict: Optional[bool] = None,
+        score_type = None
+    ) -> Union[Tuple, CausalLMOutputWithPast]:
+
+        """
+        This is from forward function. It is modified for scoring function
+        """
+        from copy import deepcopy
+
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        
+
+        (
+            input_ids,
+            position_ids,
+            attention_mask,
+            past_key_values,
+            inputs_embeds,
+            labels
+        ) = self.prepare_inputs_labels_for_multimodal(
+            input_ids, 
+            None,
+            attention_mask, 
+            past_key_values, 
+            labels, 
+            images0,
+            images1,
+        )
+
+
+        # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
+        outputs = self.model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict
+        )
+        
+
+        hidden_states = outputs[0]
+        logits = self.lm_head(hidden_states)
+
+        last_word_logits = logits[0,-1] # batch*seq*hidden
+        # yes 4874     no 694      Yes 3869      No 1939
+        yes_idx = 3869
+        no_idx = 1939
+
+        yes_exp_logit = torch.exp( last_word_logits[yes_idx].float() )
+        no_exp_logit = torch.exp( last_word_logits[no_idx].float() )
+
+        score = yes_exp_logit / (yes_exp_logit + no_exp_logit)
+        if torch.isnan(score):
+            assert False, 'Find NAN'
+        score_info = {
+            'score':score, 
+            'yes_logit':last_word_logits[yes_idx],
+            'no_logit':last_word_logits[no_idx] }
+
+        return score_info
+
+
 AutoConfig.register("llava_llama", LlavaConfig)
 AutoModelForCausalLM.register(LlavaConfig, LlavaLlamaForCausalLM)
