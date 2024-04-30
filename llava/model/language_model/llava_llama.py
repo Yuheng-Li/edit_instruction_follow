@@ -71,6 +71,9 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
+        # to check if model is updated 
+        # print(self.model.layers[12].self_attn.k_proj.weight.mean().data)
+
         if inputs_embeds is None:
             (
                 input_ids,
