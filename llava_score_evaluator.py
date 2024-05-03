@@ -98,17 +98,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--llava_model_path", type=str, default='liuhaotian/llava-v1.5-13b')
-    parser.add_argument("--test_json_file", type=str, default='../editing_instruction_following_data.json', help='')
-    parser.add_argument("--test_images_folder", type=str, default='../llava_filter_evalsample/')
+    parser.add_argument("--test_json_file", type=str, default='../edit_instruction_follow_data/evalsample.json', help='')
+    parser.add_argument("--test_images_folder", type=str, default='../edit_instruction_follow_data/evalsample')
     args = parser.parse_args()
 
 
     evaluator = LLaVAEvaluator(model_path=args.llava_model_path, model_base=None)
 
-    list_data_dict = json.load(open('../editing_instruction_following_data.json', "r"))
+    list_data_dict = json.load(open(args.test_json_file, "r"))
 
-    random.shuffle(list_data_dict)
-    list_data_dict =list_data_dict[0:100]
+    # random.shuffle(list_data_dict)
+    # list_data_dict =list_data_dict[0:100]
 
     results_TP = []
     results_TN = []
@@ -130,13 +130,13 @@ if __name__ == "__main__":
         
         data_dict['score'] = score
 
-        if   score > 0.5 and label == "Yes":
+        if   score >= 0.5 and label == "Yes":
             results_TP.append(  data_dict  )
-        elif score < 0.5 and label == "No":
+        elif score <= 0.5 and label == "No":
             results_TN.append(  data_dict  )
-        elif score > 0.5 and label == "No":
+        elif score >= 0.5 and label == "No":
             results_FP.append(  data_dict  )
-        elif score < 0.5 and label == "Yes":
+        elif score <= 0.5 and label == "Yes":
             results_FN.append(  data_dict  )
         else:
             assert False

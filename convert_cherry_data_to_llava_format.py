@@ -58,11 +58,11 @@ def create_one_data_point_for_llava(count, image_file_before, image_file_after, 
 
 
 # - - - - - - - - - - - - args - - - - - - - - - - - - #  
-file_path = '../llava_filter_evalsample/metadata.jsonl'
-folder_path = '../llava_filter_evalsample/'
+file_path = '../edit_instruction_follow_data/llava_filtering/metadata_count_100000.jsonl'
+folder_path = '../edit_instruction_follow_data/llava_filtering/'
 balance_good_bad = False 
 
-out_file = '../editing_instruction_following_data.json'
+out_file = '../edit_instruction_follow_data/llava_filtering.json'
 
 
 
