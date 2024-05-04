@@ -5,8 +5,8 @@ CUDA_VISIBLE_DEVICES=0 deepspeed llava/train/train_mem.py \
     --deepspeed ./scripts/zero3.json \
     --model_name_or_path liuhaotian/llava-v1.5-7b \
     --version v1 \
-    --data_path ../editing_instruction_following_data.json \
-    --image_folder ../llava_filter_evalsample/ \
+    --data_path ../edit_instruction_follow_data/evalsample.json \
+    --image_folder ../edit_instruction_follow_data/evalsample/ \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
