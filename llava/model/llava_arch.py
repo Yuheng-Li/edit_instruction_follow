@@ -211,11 +211,16 @@ class LlavaMetaForCausalLM(ABC):
         assert images0.ndim == 4 and images1.ndim == 4, 'Only support this case for now'
         image_features0 = self.encode_images(images0)
         image_features1 = self.encode_images(images1)
+
+        # re-arrange them so that can be sequentially used later
+        split_size = image_features0.shape[0] / input_ids.shape[0]
+        image_features0_split = torch.split(image_features0, int(split_size) )
+        image_features1_split = torch.split(image_features1, int(split_size) )
         image_features = []
-        for image_feature0, image_feature1 in zip(image_features0, image_features1):
+        for image_feature0, image_feature1 in zip(image_features0_split, image_features1_split):
             image_features.append(image_feature0)
             image_features.append(image_feature1)
-        image_features = torch.stack(image_features)
+        image_features = torch.cat(image_features, dim=0)
 
 
         # TODO: image start / end is not implemented here to support pretraining.
