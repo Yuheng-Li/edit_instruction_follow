@@ -58,11 +58,10 @@ def create_one_data_point_for_llava(count, image_file_before, image_file_after, 
 
 
 # - - - - - - - - - - - - args - - - - - - - - - - - - #  
-file_path = '../edit_instruction_follow_data/llava_filtering/metadata_count_100000.jsonl'
-folder_path = '../edit_instruction_follow_data/llava_filtering/'
+file_path = '/sensei-fs/users/nanxuanz/data_share/llava_filtering/metadata_count_700000_s3.jsonl'
 balance_good_bad = False 
 
-out_file = '../edit_instruction_follow_data/llava_filtering.json'
+out_file = '../edit_instruction_follow_data/llava_filtering_700k.json'
 
 
 
@@ -77,7 +76,7 @@ raw_data = read_metadata(file_path)
 for raw_datum in raw_data:
 
     # fetch instruction
-    instruction = read_instruction( os.path.join(folder_path, raw_datum['index'], 'instruction.txt') )
+    instruction = raw_datum["instruction"]  #  read_instruction( os.path.join(folder_path, raw_datum['index'], 'instruction.txt') )
 
     # get good and bad samples 
     good_samples = set(tuple(item) for item in raw_datum['good_sample'])

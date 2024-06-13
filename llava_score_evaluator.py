@@ -18,7 +18,15 @@ import os
 from tqdm import tqdm
 import random
 
-
+from flash_s3_dataloader.s3_io import \
+    load_s3_image, save_s3_image, \
+    load_s3_text, save_s3_text, \
+    load_s3_json, save_s3_json, \
+    check_s3_exists, list_s3_dir, \
+    parallel_upload_folder_to_s3, parallel_download_folder_from_s3, \
+    upload_file, download_file, \
+    get_s3_filesize, load_s3_exr, \
+    save_ckpt_to_s3, load_ckpt_from_s3
 
 class LLaVAEvaluator:
     def __init__(self, model_path=None, model_base=None):
@@ -66,10 +74,10 @@ class LLaVAEvaluator:
 
 
         # image tensor
-        image0 = Image.open(image0).convert('RGB')
+        image0 = load_s3_image(image0).convert('RGB')
         image0_tensor = process_images([image0], self.image_processor, self.model.config).cuda().to(self.dtype)
 
-        image1 = Image.open(image1).convert('RGB')
+        image1 = load_s3_image(image1).convert('RGB')
         image1_tensor = process_images([image1], self.image_processor, self.model.config).cuda().to(self.dtype)
 
 
@@ -99,7 +107,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--llava_model_path", type=str, default='liuhaotian/llava-v1.5-13b')
     parser.add_argument("--test_json_file", type=str, default='../edit_instruction_follow_data/evalsample.json', help='')
-    parser.add_argument("--test_images_folder", type=str, default='../edit_instruction_follow_data/evalsample')
+    parser.add_argument("--test_images_folder", type=str, default='s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/')
     args = parser.parse_args()
 
 
@@ -143,8 +151,9 @@ if __name__ == "__main__":
 
     print("Acc: ", (len(results_TP)+len(results_TN)) / total  * 100  )
     print(" ")
-    print("TP: ", len(results_TP) / total  * 100  )
-    print("TN: ", len(results_TN) / total  * 100  )
-    print("FP: ", len(results_FP) / total  * 100  )
-    print("FN: ", len(results_FN) / total  * 100  )
+    print("TOTAL: ", total )
+    print("TP: ", len(results_TP)   )
+    print("TN: ", len(results_TN)   )
+    print("FP: ", len(results_FP)   )
+    print("FN: ", len(results_FN)   )
 

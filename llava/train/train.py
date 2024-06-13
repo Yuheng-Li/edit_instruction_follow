@@ -37,6 +37,15 @@ from llava.mm_utils import tokenizer_image_token
 
 from PIL import Image
 
+from flash_s3_dataloader.s3_io import \
+    load_s3_image, save_s3_image, \
+    load_s3_text, save_s3_text, \
+    load_s3_json, save_s3_json, \
+    check_s3_exists, list_s3_dir, \
+    parallel_upload_folder_to_s3, parallel_download_folder_from_s3, \
+    upload_file, download_file, \
+    get_s3_filesize, load_s3_exr, \
+    save_ckpt_to_s3, load_ckpt_from_s3
 
 local_rank = None
 
@@ -74,7 +83,7 @@ class DataArguments:
     is_multimodal: bool = False
     image_folder: Optional[str] = field(default=None)
     image_aspect_ratio: str = 'square'
-    highres = True
+    highres = False
 
 
 @dataclass
@@ -728,7 +737,8 @@ class LazySupervisedDataset(Dataset):
     def get_image(self, path):
 
         processor = self.data_args.image_processor
-        image = Image.open(path).convert('RGB')
+        # image = Image.open(path).convert('RGB')
+        image = load_s3_image(path).convert('RGB')
 
         if self.data_args.image_aspect_ratio == 'pad':
             image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
