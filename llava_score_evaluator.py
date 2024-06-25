@@ -108,6 +108,8 @@ if __name__ == "__main__":
     parser.add_argument("--llava_model_path", type=str, default='liuhaotian/llava-v1.5-13b')
     parser.add_argument("--test_json_file", type=str, default='../edit_instruction_follow_data/evalsample.json', help='')
     parser.add_argument("--test_images_folder", type=str, default='s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/')
+
+    parser.add_argument("--output_jsonl_file_path", type=str, default='result.jsonl', help='')
     args = parser.parse_args()
 
 
@@ -118,11 +120,8 @@ if __name__ == "__main__":
     # random.shuffle(list_data_dict)
     # list_data_dict =list_data_dict[0:100]
 
-    results_TP = []
-    results_TN = []
-    results_FP = []
-    results_FN = []
 
+    save = []
     total = len(list_data_dict)
     for data_dict in tqdm(list_data_dict):
         
@@ -135,25 +134,19 @@ if __name__ == "__main__":
         with torch.no_grad():
             score_info = evaluator(image0, image1, caption)
             score = score_info['score'].item()
-        
-        data_dict['score'] = score
 
-        if   score >= 0.5 and label == "Yes":
-            results_TP.append(  data_dict  )
-        elif score <= 0.5 and label == "No":
-            results_TN.append(  data_dict  )
-        elif score >= 0.5 and label == "No":
-            results_FP.append(  data_dict  )
-        elif score <= 0.5 and label == "Yes":
-            results_FN.append(  data_dict  )
-        else:
-            assert False
+        save.append( dict(label=label, score=score) )
 
-    print("Acc: ", (len(results_TP)+len(results_TN)) / total  * 100  )
-    print(" ")
-    print("TOTAL: ", total )
-    print("TP: ", len(results_TP)   )
-    print("TN: ", len(results_TN)   )
-    print("FP: ", len(results_FP)   )
-    print("FN: ", len(results_FN)   )
+
+    with open(args.output_jsonl_file_path, 'w') as f:
+        for item in save:
+            json.dump(item, f)
+            f.write('\n')
+    # print("Acc: ", (len(results_TP)+len(results_TN)) / total  * 100  )
+    # print(" ")
+    # print("TOTAL: ", total )
+    # print("TP: ", len(results_TP)   )
+    # print("TN: ", len(results_TN)   )
+    # print("FP: ", len(results_FP)   )
+    # print("FN: ", len(results_FN)   )
 
