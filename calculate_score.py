@@ -1,52 +1,64 @@
 import json
 import argparse
+import numpy as np
+import matplotlib.pyplot as plt
 
+def calculate_precision_recall(data, threshold):
+    TP = 0
+    TN = 0
+    FP = 0
+    FN = 0
+    
+    for datum in data:
+        score = datum['score']
+        label = datum['label']
 
-parser = argparse.ArgumentParser()
+        if score >= threshold and label == "Yes":
+            TP += 1
+        elif score < threshold and label == "No":
+            TN += 1
+        elif score >= threshold and label == "No":
+            FP += 1
+        elif score < threshold and label == "Yes":
+            FN += 1
 
-parser.add_argument("--result_jsonl_file_path", type=str, default='result.jsonl', help='')
-parser.add_argument("--thres", type=float, default=0.5, help='')
-args = parser.parse_args()
+    precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+    recall = TP / (TP + FN) if (TP + FN) > 0 else 0
 
+    return precision, recall
 
-data = []
-with open(args.result_jsonl_file_path, 'r') as file:
-    for line in file:
-        data.append(json.loads(line))
+def plot_precision_recall_curve(data, thresholds, output_path):
+    precisions = []
+    recalls = []
 
-total = len(data)
-results_TP = 0
-results_TN = 0
-results_FP = 0
-results_FN = 0
+    for threshold in thresholds:
+        precision, recall = calculate_precision_recall(data, threshold)
+        precisions.append(precision)
+        recalls.append(recall)
 
+    plt.figure()
+    plt.plot(recalls, precisions, marker='.')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.grid(True)
+    plt.savefig(output_path)
+    plt.close()
 
-thres = args.thres
-for datum in data:
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--result_jsonl_file_path", type=str, default='result.jsonl', help='Path to the JSONL result file')
+    parser.add_argument("--output_path", type=str, default='precision_recall_curve.png', help='Path to save the precision-recall curve image')
+    args = parser.parse_args()
 
-    score = datum['score']
-    label = datum['label']
+    # Read data from the JSONL file
+    data = []
+    with open(args.result_jsonl_file_path, 'r') as file:
+        for line in file:
+            data.append(json.loads(line))
 
-    if   score >= thres and label == "Yes":
-        results_TP += 1
-    elif score <= thres and label == "No":
-        results_TN += 1
-    elif score >= thres and label == "No":
-        results_FP += 1
-    elif score <= thres and label == "Yes":
-        results_FN += 1
-    else:
-        assert False
+    # Define a range of thresholds
+    thresholds = np.arange(0, 1.01, 0.01)
 
-
-print("Acc: ", (results_TP+results_TN) / total  * 100  )
-print(" ")
-print("TOTAL: ", total )
-print("TP: ", results_TP   )
-print("TN: ", results_TN   )
-print("FP: ", results_FP   )
-print("FN: ", results_FN   )
-
-print("prevision: ", results_TP / (results_TP+results_FP)   )
-print("recall: ",    results_TP / (results_TP+results_FN)   )
-
+    # Plot and save the precision-recall curve
+    plot_precision_recall_curve(data, thresholds, args.output_path)
