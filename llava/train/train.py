@@ -36,6 +36,9 @@ from llava.model import *
 from llava.mm_utils import tokenizer_image_token
 
 from PIL import Image
+import base64
+import gzip
+import numpy as np
 
 from flash_s3_dataloader.s3_io import \
     load_s3_image, save_s3_image, \
@@ -82,6 +85,7 @@ class DataArguments:
     lazy_preprocess: bool = False
     is_multimodal: bool = False
     image_folder: Optional[str] = field(default=None)
+    mask_folder: Optional[str] = field( default=None, metadata={"help":"If given, then will crop image region defined by bbox of the mask"} )
     image_aspect_ratio: str = 'square'
     highres = False
 
@@ -698,6 +702,32 @@ def split_image(image):
     return image, topleft_img, topright_img, bottomleft_img, bottomright_img
 
 
+def decompressed_descriptor(comb_comp_64_ascii):
+    comb_comp_64 = comb_comp_64_ascii.encode()
+    comb_comp = base64.b64decode(comb_comp_64)
+    comb_bytes = gzip.decompress(comb_comp)
+    comb_array_normed = np.frombuffer(comb_bytes, dtype=bool)
+    return comb_array_normed
+
+def find_bbox(mask):
+    if mask.min() == 255 or mask.max() == 0:
+        # corner case 
+        return 0,0,1,1
+    rows = np.any(mask == 255, axis=1)
+    cols = np.any(mask == 255, axis=0)
+    y1, y2 = np.where(rows)[0][[0, -1]]
+    x1, x2 = np.where(cols)[0][[0, -1]]
+    # normalized
+    height, width = mask.shape
+    x1, x2 = x1 / (width-1),  x2 / (width-1)
+    y1, y2 = y1 / (height-1), y2 / (height-1)
+    # just in case
+    x1, y1, x2, y2 = max(0,x1), max(0, y1), min(1,x2), min(1, y2)
+    if x1==x2 or y1==y2:
+        # corner case 
+        return 0,0,1,1
+    return x1, y1, x2, y2
+
 
 class LazySupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
@@ -712,6 +742,11 @@ class LazySupervisedDataset(Dataset):
         self.tokenizer = tokenizer
         self.list_data_dict = list_data_dict
         self.data_args = data_args
+
+        if self.data_args.mask_folder:
+            rank0_print("mask folder is given, image will be cropped by mask")
+            rank0_print("mask folder is given, image will be cropped by mask")
+            rank0_print("mask folder is given, image will be cropped by mask")
 
     def __len__(self):
         return len(self.list_data_dict)
@@ -734,11 +769,14 @@ class LazySupervisedDataset(Dataset):
         return length_list
     
 
-    def get_image(self, path):
+    def get_image(self, path, mask_path=None):
 
         processor = self.data_args.image_processor
         # image = Image.open(path).convert('RGB')
         image = load_s3_image(path).convert('RGB')
+
+        if mask_path:
+            image = self.crop_image_by_mask(image, mask_path)
 
         if self.data_args.image_aspect_ratio == 'pad':
             image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
@@ -755,6 +793,27 @@ class LazySupervisedDataset(Dataset):
         
         return image
 
+    def parse_mask_filename(self, image_filename):
+        "according to cherry data format"
+        tmp0, tmp1 = image_filename.split('_')[0].split('/')
+        mask_name = tmp0+'_'+tmp1+'_0.json'
+        return mask_name
+
+    def crop_image_by_mask(self, image, mask_path):
+
+        mask_info = load_s3_json(mask_path)
+        mask = decompressed_descriptor(mask_info['mask'])
+        mask = mask.reshape((mask_info['h'], mask_info['w']))
+        mask = (mask * 255).astype(np.uint8)
+
+        x1, y1, x2, y2 = find_bbox(mask)
+        
+        H, W = image.size
+        x1, x2 = int(x1*W), int(x2*W)
+        y1, y2 = int(y1*H), int(y2*H)
+
+        return image.crop( (x1, y1, x2, y2) )
+
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
         sources = self.list_data_dict[i]
         if isinstance(i, int):
@@ -767,10 +826,15 @@ class LazySupervisedDataset(Dataset):
         if 'image' in sources[0]:
             image_file = self.list_data_dict[i]['image']
             image_folder = self.data_args.image_folder
- 
-            image0 = self.get_image(  os.path.join(image_folder, image_file[0])  )
-            image1 = self.get_image(  os.path.join(image_folder, image_file[1])  )
-  
+            mask_folder = self.data_args.mask_folder
+
+            mask_path = None
+            if mask_folder:
+                mask_path = self.parse_mask_filename(image_file[0])
+                mask_path = os.path.join(mask_folder, mask_path)
+            image0 = self.get_image(  os.path.join(image_folder, image_file[0]), mask_path  )
+            image1 = self.get_image(  os.path.join(image_folder, image_file[1]), mask_path  )
+
             sources = preprocess_multimodal( 
                 copy.deepcopy([e["conversations"] for e in sources]),
                 self.data_args)
@@ -1037,8 +1101,12 @@ def train(attn_implementation=None):
                     **data_module)
 
     # train_dataset = data_module['train_dataset']
-    # xx = train_dataset[0]  # input_ids, labels, image
-    # input_ids = xx['input_ids']        
+    # xxx = list(range(0,10000))
+    # import random
+    # random.shuffle(xxx)
+    # for i in xxx:
+    #     print(i)
+    #     xx = train_dataset[i]  # input_ids, labels, image   
     # breakpoint()
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)

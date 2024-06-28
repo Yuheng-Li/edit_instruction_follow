@@ -26,6 +26,17 @@ def decompressed_descriptor(comb_comp_64_ascii):
     comb_array_normed = np.frombuffer(comb_bytes, dtype=bool)
     return comb_array_normed
 
+def find_bbox(mask):
+    # Find the rows and columns where the mask has foreground pixels
+    rows = np.any(mask == 0, axis=1)
+    cols = np.any(mask == 0, axis=0)
+
+    # Determine the bounding box coordinates
+    y1, y2 = np.where(rows)[0][[0, -1]]
+    x1, x2 = np.where(cols)[0][[0, -1]]
+
+    # Return the bounding box in the format (x1, y1, x2, y2)
+    return x1, y1, x2, y2
 
 llava_file_path = '../edit_instruction_follow_data/llava_filtering_100k.json'
 
@@ -48,6 +59,8 @@ for datum in tqdm(data):
     mask = mask.reshape((mask_info['h'], mask_info['w']))
 
     # save 
-    # mask = (mask * 255).astype(np.uint8)  
+    mask = (mask * 255).astype(np.uint8)
+    x1, y1, x2, y2 = find_bbox(mask)
+    breakpoint()  
     # image = Image.fromarray(mask, mode='L')  
     # image.save('output_mask_image.png')
