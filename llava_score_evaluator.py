@@ -17,6 +17,10 @@ import json
 import os 
 from tqdm import tqdm
 import random
+import base64
+import gzip
+import numpy as np
+
 
 from flash_s3_dataloader.s3_io import \
     load_s3_image, save_s3_image, \
@@ -53,7 +57,7 @@ class LLaVAEvaluator:
 
 
     @torch.no_grad()
-    def __call__(self, image0, image1, caption, output_attentions=False):
+    def __call__(self, image0, image1, caption, mask=None):
 
 
         # user_question = 'Is this image matched with the caption: '+caption
@@ -75,9 +79,13 @@ class LLaVAEvaluator:
 
         # image tensor
         image0 = load_s3_image(image0).convert('RGB')
+        if mask:
+            image0 = crop_image_by_mask(image0, mask)
         image0_tensor = process_images([image0], self.image_processor, self.model.config).cuda().to(self.dtype)
 
         image1 = load_s3_image(image1).convert('RGB')
+        if mask:
+            image1 = crop_image_by_mask(image1, mask)
         image1_tensor = process_images([image1], self.image_processor, self.model.config).cuda().to(self.dtype)
 
 
@@ -90,15 +98,60 @@ class LLaVAEvaluator:
             labels=None, 
             use_cache=True,
             score_type='yesno',
-            output_attentions=output_attentions,
+            output_attentions=False,
             )
 
         return score_info
 
 
 
+def parse_mask_filename(image_filename):
+    "according to cherry data format"
+    tmp0, tmp1 = image_filename.split('_')[0].split('/')
+    mask_name = tmp0+'_'+tmp1+'_0.json'
+    return mask_name
 
 
+def decompressed_descriptor(comb_comp_64_ascii):
+    comb_comp_64 = comb_comp_64_ascii.encode()
+    comb_comp = base64.b64decode(comb_comp_64)
+    comb_bytes = gzip.decompress(comb_comp)
+    comb_array_normed = np.frombuffer(comb_bytes, dtype=bool)
+    return comb_array_normed
+
+
+def find_bbox(mask):
+    if mask.min() == 255 or mask.max() == 0:
+        # corner case 
+        return 0,0,1,1
+    rows = np.any(mask == 255, axis=1)
+    cols = np.any(mask == 255, axis=0)
+    y1, y2 = np.where(rows)[0][[0, -1]]
+    x1, x2 = np.where(cols)[0][[0, -1]]
+    # normalized
+    height, width = mask.shape
+    x1, x2 = x1 / (width-1),  x2 / (width-1)
+    y1, y2 = y1 / (height-1), y2 / (height-1)
+    # just in case
+    x1, y1, x2, y2 = max(0,x1), max(0, y1), min(1,x2), min(1, y2)
+    if x1==x2 or y1==y2:
+        # corner case 
+        return 0,0,1,1
+    return x1, y1, x2, y2
+
+
+def crop_image_by_mask(image, mask_path):
+    mask_info = load_s3_json(mask_path)
+    mask = decompressed_descriptor(mask_info['mask'])
+    mask = mask.reshape((mask_info['h'], mask_info['w']))
+    mask = (mask * 255).astype(np.uint8)
+    x1, y1, x2, y2 = find_bbox(mask)
+    
+    H, W = image.size
+    x1, x2 = int(x1*W), int(x2*W)
+    y1, y2 = int(y1*H), int(y2*H)
+
+    return image.crop( (x1, y1, x2, y2) )
 
 
 
@@ -108,7 +161,8 @@ if __name__ == "__main__":
     parser.add_argument("--llava_model_path", type=str, default='liuhaotian/llava-v1.5-13b')
     parser.add_argument("--test_json_file", type=str, default='../edit_instruction_follow_data/evalsample.json', help='')
     parser.add_argument("--test_images_folder", type=str, default='s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/')
-
+    parser.add_argument("--test_masks_folder", type=str, default='s3://myedit-cz/merge_three_segs/stock5M_ediffiN130_v1/')
+    parser.add_argument('--enable_mask', action='store_true')
     parser.add_argument("--output_jsonl_file_path", type=str, default='result.jsonl', help='')
     args = parser.parse_args()
 
@@ -128,11 +182,15 @@ if __name__ == "__main__":
         image0 = os.path.join(  os.path.join( args.test_images_folder,  data_dict['image'][0]  )  )
         image1 = os.path.join(  os.path.join( args.test_images_folder,  data_dict['image'][1]  )  )
 
+        mask = None 
+        if args.enable_mask:
+            mask = parse_mask_filename(data_dict['image'][0])
+            mask = os.path.join(args.test_masks_folder, mask)
         caption =  data_dict['conversations'][0]['value']
         label = data_dict['conversations'][1]['value']
 
         with torch.no_grad():
-            score_info = evaluator(image0, image1, caption)
+            score_info = evaluator(image0, image1, caption, mask)
             score = score_info['score'].item()
 
         save.append( dict(label=label, score=score) )
