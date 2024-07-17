@@ -19,7 +19,7 @@ def read_instruction(path):
     return lines[0] # assume they all the same
 
 
-def create_one_data_point_for_llava(count, image_file_before, image_file_after, instruction, answer):
+def create_one_data_point_for_llava(count, image_file_before, image_file_after, instruction, answer, edit_type):
     
     # trimming and adjusting whitespace, capitalizing the first letter, and ensuring punctuation is formatted correctly.
     instruction = instruction.strip().strip('.').strip().capitalize() + '.'
@@ -52,16 +52,18 @@ def create_one_data_point_for_llava(count, image_file_before, image_file_after, 
         image = [image_file_before, image_file_after],
         conversations = conversations
     )
+    if edit_type:
+        out['edit_type'] = edit_type
 
     return out
 
 
 
 # - - - - - - - - - - - - args - - - - - - - - - - - - #  
-file_path = '/sensei-fs/users/nanxuanz/data_share/llava_filtering/metadata_count_700000_s3.jsonl'
+file_path = '/sensei-fs/users/nanxuanz/data_share/llava_filtering/metadata_count_val_s3.jsonl'
 balance_good_bad = False 
 
-out_file = '../edit_instruction_follow_data/llava_filtering_700k.json'
+out_file = '../edit_instruction_follow_data/temp.json'
 
 
 
@@ -78,6 +80,10 @@ for raw_datum in raw_data:
     # fetch instruction
     instruction = raw_datum["instruction"]  #  read_instruction( os.path.join(folder_path, raw_datum['index'], 'instruction.txt') )
 
+    edit_type = None
+    if  'edit_type' in raw_datum:
+        edit_type = int(raw_datum['edit_type'])
+
     # get good and bad samples 
     good_samples = set(tuple(item) for item in raw_datum['good_sample'])
     all_samples = set(tuple(item) for item in raw_datum['all_sample'])
@@ -90,7 +96,8 @@ for raw_datum in raw_data:
             os.path.join(raw_datum['index'], sample[0] ), 
             os.path.join(raw_datum['index'], sample[1] ),
             instruction,
-            'Yes'  
+            'Yes',
+            edit_type  
             )
         good_sample_conversations.append( conv )
         total_count += 1
@@ -102,7 +109,8 @@ for raw_datum in raw_data:
             os.path.join(raw_datum['index'], sample[0] ), 
             os.path.join(raw_datum['index'], sample[1] ),
             instruction,
-            'No'  
+            'No',
+            edit_type  
             )
         bad_sample_conversations.append( conv )
         total_count += 1
