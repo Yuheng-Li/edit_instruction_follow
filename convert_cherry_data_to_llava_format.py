@@ -60,10 +60,10 @@ def create_one_data_point_for_llava(count, image_file_before, image_file_after, 
 
 
 # - - - - - - - - - - - - args - - - - - - - - - - - - #  
-file_path = '/sensei-fs/users/nanxuanz/data_share/llava_filtering/metadata_count_val_s3.jsonl'
+file_path = '../llava_filter_evalsample_stock_TODO/metadata_w_instruction.jsonl'
 balance_good_bad = False 
 
-out_file = '../edit_instruction_follow_data/evalsample.json'
+out_file = '../edit_instruction_follow_data/evalsample_real_img.json'
 
 
 

@@ -808,7 +808,7 @@ class LazySupervisedDataset(Dataset):
 
         x1, y1, x2, y2 = find_bbox(mask)
         
-        H, W = image.size
+        W, H = image.size
         x1, x2 = int(x1*W), int(x2*W)
         y1, y2 = int(y1*H), int(y2*H)
 
