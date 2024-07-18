@@ -193,7 +193,10 @@ if __name__ == "__main__":
             score_info = evaluator(image0, image1, caption, mask)
             score = score_info['score'].item()
 
-        save.append( dict(label=label, score=score) )
+        item = dict(label=label, score=score)
+        if 'edit_type' in data_dict:
+            item['edit_type'] =  data_dict['edit_type']
+        save.append(item)
 
 
     with open(args.output_jsonl_file_path, 'w') as f:

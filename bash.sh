@@ -1,1 +1,1 @@
-python llava_score_evaluator.py --llava_model_path ../edit_instruction_follow_ckpt/llava-v1.5-13b-init_try_700k/
+python llava_score_evaluator.py --llava_model_path ../edit_instruction_follow_ckpt/llava-v1.5-13b-init_try_700k_mask/  --enable_mask
