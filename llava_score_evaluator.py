@@ -150,6 +150,7 @@ class LLaVAEvaluator:
         # import torchvision
         # torchvision.utils.save_image(image0_tensor, 'img0_tensor.png')
         # torchvision.utils.save_image(image1_tensor, 'img1_tensor.png')
+        # print(caption)
         # breakpoint()
         setattr(self.model, 'tokenizer', self.tokenizer) # easy for me to debug
         
@@ -163,7 +164,7 @@ class LLaVAEvaluator:
             output_attentions=False,
             )
 
-        return score_info
+        return score_info, image0_tensor
 
 
 
@@ -252,7 +253,7 @@ if __name__ == "__main__":
         print('mask is requred, pay attention to mask path parsing strategy')
 
     save = []
-    # total = len(list_data_dict)
+    temp = []
     for data_dict in tqdm(list_data_dict):
         
         image0 = os.path.join(  os.path.join( args.test_images_folder,  data_dict['image'][0]  )  )
@@ -267,14 +268,17 @@ if __name__ == "__main__":
         label = data_dict['conversations'][1]['value']
 
         with torch.no_grad():
-            score_info = evaluator(image0, image1, caption, mask)
+            score_info, tmp = evaluator(image0, image1, caption, mask)
             score = score_info['score'].item()
-
+            temp.append(tmp)
         item = dict(label=label, score=score)
         if 'edit_type' in data_dict:
             item['edit_type'] =  data_dict['edit_type']
         save.append(item)
 
+    # breakpoint()
+    # import torchvision
+    # torchvision.utils.save_image(  torch.cat(temp, dim=0), 'xxx.jpg', nrow=10 )
 
     name = args.output_jsonl_file_path 
     if args.total_chunk >1:
