@@ -8,9 +8,84 @@ CUDA_VISIBLE_DEVICES=0 python llava_score_evaluator.py \
     --test_json_file ../edit_instruction_follow_data/evalsample.json \
     --test_images_folder s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/ \
     --test_masks_folder s3://myedit-cz/merge_three_segs/stock5M_ediffiN130_v1/ \
-    --total_chunk 1 \
+    --total_chunk 8 \
     --chunk_idx 0 \
-    --output_jsonl_file_path result.jsonl   
+    --output_jsonl_file_path result.jsonl   &
+
+CUDA_VISIBLE_DEVICES=1 python llava_score_evaluator.py \
+    --enable_mask \
+    --llava_model_path ../edit_instruction_follow_ckpt/llava-v1.5-13b-init_try_700k_mask/ \
+    --test_json_file ../edit_instruction_follow_data/evalsample.json \
+    --test_images_folder s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/ \
+    --test_masks_folder s3://myedit-cz/merge_three_segs/stock5M_ediffiN130_v1/ \
+    --total_chunk 8 \
+    --chunk_idx 1 \
+    --output_jsonl_file_path result.jsonl   &
+
+CUDA_VISIBLE_DEVICES=2 python llava_score_evaluator.py \
+    --enable_mask \
+    --llava_model_path ../edit_instruction_follow_ckpt/llava-v1.5-13b-init_try_700k_mask/ \
+    --test_json_file ../edit_instruction_follow_data/evalsample.json \
+    --test_images_folder s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/ \
+    --test_masks_folder s3://myedit-cz/merge_three_segs/stock5M_ediffiN130_v1/ \
+    --total_chunk 8 \
+    --chunk_idx 2 \
+    --output_jsonl_file_path result.jsonl   &
+
+CUDA_VISIBLE_DEVICES=3 python llava_score_evaluator.py \
+    --enable_mask \
+    --llava_model_path ../edit_instruction_follow_ckpt/llava-v1.5-13b-init_try_700k_mask/ \
+    --test_json_file ../edit_instruction_follow_data/evalsample.json \
+    --test_images_folder s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/ \
+    --test_masks_folder s3://myedit-cz/merge_three_segs/stock5M_ediffiN130_v1/ \
+    --total_chunk 8 \
+    --chunk_idx 3 \
+    --output_jsonl_file_path result.jsonl   &
+
+
+
+
+
+
+CUDA_VISIBLE_DEVICES=4 python llava_score_evaluator.py \
+    --enable_mask \
+    --llava_model_path ../edit_instruction_follow_ckpt/llava-v1.5-13b-init_try_700k_mask/ \
+    --test_json_file ../edit_instruction_follow_data/evalsample.json \
+    --test_images_folder s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/ \
+    --test_masks_folder s3://myedit-cz/merge_three_segs/stock5M_ediffiN130_v1/ \
+    --total_chunk 8 \
+    --chunk_idx 4 \
+    --output_jsonl_file_path result.jsonl   &
+
+CUDA_VISIBLE_DEVICES=5 python llava_score_evaluator.py \
+    --enable_mask \
+    --llava_model_path ../edit_instruction_follow_ckpt/llava-v1.5-13b-init_try_700k_mask/ \
+    --test_json_file ../edit_instruction_follow_data/evalsample.json \
+    --test_images_folder s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/ \
+    --test_masks_folder s3://myedit-cz/merge_three_segs/stock5M_ediffiN130_v1/ \
+    --total_chunk 8 \
+    --chunk_idx 5 \
+    --output_jsonl_file_path result.jsonl   &
+
+CUDA_VISIBLE_DEVICES=6 python llava_score_evaluator.py \
+    --enable_mask \
+    --llava_model_path ../edit_instruction_follow_ckpt/llava-v1.5-13b-init_try_700k_mask/ \
+    --test_json_file ../edit_instruction_follow_data/evalsample.json \
+    --test_images_folder s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/ \
+    --test_masks_folder s3://myedit-cz/merge_three_segs/stock5M_ediffiN130_v1/ \
+    --total_chunk 8 \
+    --chunk_idx 6 \
+    --output_jsonl_file_path result.jsonl   &
+
+CUDA_VISIBLE_DEVICES=7 python llava_score_evaluator.py \
+    --enable_mask \
+    --llava_model_path ../edit_instruction_follow_ckpt/llava-v1.5-13b-init_try_700k_mask/ \
+    --test_json_file ../edit_instruction_follow_data/evalsample.json \
+    --test_images_folder s3://myedit-cz/upsample_1k/_nomask/masked_results/stock5M_ediffiN130_v1/merge_three_segs/ \
+    --test_masks_folder s3://myedit-cz/merge_three_segs/stock5M_ediffiN130_v1/ \
+    --total_chunk 8 \
+    --chunk_idx 7 \
+    --output_jsonl_file_path result.jsonl   &
 
 
 

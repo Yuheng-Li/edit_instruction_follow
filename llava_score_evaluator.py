@@ -244,7 +244,7 @@ if __name__ == "__main__":
     list_data_dict = json.load(open(args.test_json_file, "r"))
 
     list_data_dict = split_list_into_chunks(list_data_dict, args.total_chunk)[args.chunk_idx]
-    # random.shuffle(list_data_dict)
+    #random.shuffle(list_data_dict)
     # list_data_dict =list_data_dict[0:100]
 
     if  args.enable_mask:
@@ -271,7 +271,8 @@ if __name__ == "__main__":
             score_info, tmp = evaluator(image0, image1, caption, mask)
             score = score_info['score'].item()
             temp.append(tmp)
-        item = dict(label=label, score=score)
+
+        item = dict(label=label, score=score, image=data_dict['image'])
         if 'edit_type' in data_dict:
             item['edit_type'] =  data_dict['edit_type']
         save.append(item)
